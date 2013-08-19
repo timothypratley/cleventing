@@ -38,24 +38,27 @@
   (defn snapshot
     "Switches to a new label and writes out the current world state asynchronously."
     [world]
-    (let [sf (java.text.SimpleDateFormat. "yyyy_MM_dd__HH_mm_ss__SSS")
+    (let [sf (java.text.SimpleDateFormat.
+              "yyyy_MM_dd__HH_mm_ss__SSS")
           now (java.util.Date.)
-          label (.format sf now)]
+          label (.format sf now)
+          state-file (file "data" (str label ".state"))]
       (reset! current-label label)
       (reset! event-count 0)
-      ; write the snapsot asynchronously on another thread to avoid delays
+      ; write the snapshot asynchronously on another thread to avoid delays
       ; the world we are looking at is immutable
-      (future (io! (with-open [w (writer (file "data" (str label ".state")))]
-                     (clojure.pprint/pprint world w))))))
+      (future
+        (io! (with-open [w (writer state-file)]
+               (clojure.pprint/pprint world w))))))
 
   (defn- store
     "Writes an event to file"
     [event]
-    (io! (with-open [w (writer (file "data" (str @current-label ".events"))
-                               :append true)]
-           (clojure.pprint/pprint event w)))
-    (when (>= (event :seq) events-per-snapshot)
-      (snapshot @world)))
+    (let [event-file (file "data" (str @current-label ".events"))]
+      (io! (with-open [w (writer event-file :append true)]
+             (clojure.pprint/pprint event w)))
+      (when (>= (event :seq) events-per-snapshot)
+        (snapshot @world))))
 
   (defn hydrate
     "Load world state and process the event log.
